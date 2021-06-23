@@ -39,7 +39,7 @@ sys.path.append(parent)
 
 # +
 try:
-    df = pd.read_csv(parent + '/data/applicable_trials_2021-05-14.csv')
+    df = pd.read_csv(parent + '/data/applicable_trials_2021-06-15.csv')
     print(f'Existing data loaded sucessfully! {len(df)} trials in this dataset.')
     
 except FileNotFoundError:
@@ -48,12 +48,12 @@ except FileNotFoundError:
     #This data is the full ClinicalTrials.gov dataset for 14 May 2021.
     #Due to size, this is not in our GitHub repo, but stored on Dropbox 
     #You should also be able to download the raw data using this URL
-    path = 'https://www.dropbox.com/s/ovzhmefl5o7pip1/clinicaltrials_raw_clincialtrials_json_2021-05-14.csv.zip?dl=1'
+    path = 'https://www.dropbox.com/s/ovzhmefl5o7pip1/clinicaltrials_raw_clincialtrials_json_2021-06-15.csv.zip?dl=1'
 
     from lib.data_functions import fda_reg, get_data
 
     fda_reg_dict = fda_reg(old_fda)
-    lines = get_data(path, '2021-05-14')
+    lines = get_data(path, '2021-06-15')
 
     #headers is just the list of header names to save space here
     from lib.final_df import make_row, make_dataframe, headers
@@ -65,7 +65,7 @@ except FileNotFoundError:
     del lines
     
     #Uncomment this to save as a csv as appropriate
-    df.to_csv(parent + '/data/applicable_trials_2021-05-14.csv', index=False)
+    df.to_csv(parent + '/data/applicable_trials_2021-06-14.csv', index=False)
 # -
 
 df.columns
@@ -89,23 +89,77 @@ def get_weeks(df, start_dt, end_dt):
                                                                                       'first_results_submission_any']]
     
     grouped = results.groupby('first_results_submission_any', as_index=False).count()
-    weeks = grouped.resample('W-WED', on='first_results_submission_any').sum().reset_index()
+    weeks = grouped.resample('W-TUE', on='first_results_submission_any').sum().reset_index()
     weeks.index = range(1,len(weeks)+1)
     return weeks
 
 
-weeks_2021 = get_weeks(df, '2020-12-30', '2021-05-12')
-weeks_2020 = get_weeks(df, '2020-01-01', '2020-05-13')
-weeks_2019 = get_weeks(df, '2019-01-02', '2019-05-15')
+# +
+#This gets us the trial IDs for the post-letter trials
+# -
+
+results = df[(df.first_results_submission_any > pd.to_datetime('2021-04-27')) & 
+                  (df.first_results_submission_any <= pd.to_datetime('2021-06-08'))][['nct_id', 
+                                                                                      'first_results_submission_any']]
+
+reporting_2021 = results.nct_id.to_list()
+
+len(reporting_2021)
+
+# +
+#Setting the first 23 weeks of the year for 2019-2021. The date in the "first_results_submission_any" column
+#is the last day included in the count for that week.
+#The FDA letter was announced on Wednesday the 28th so we run our weeks from Wed-Tues in order to capture the week
+#Starting from the day the letter was announced.
+# -
+
+weeks_2021 = get_weeks(df, '2020-12-29', '2021-06-08')
+weeks_2020 = get_weeks(df, '2019-12-31', '2020-06-09')
+weeks_2019 = get_weeks(df, '2019-01-01', '2019-06-11')
+
+# +
+#Checking what the highest week ever was since the Final Rule came into effect
+# -
+
+all_weeks = get_weeks(df, '2017-01-17', '2021-06-08')
+all_weeks.nct_id.max()
+
+# +
+#Checking how many weeks exceeded 70 trials since the Final Rule
+# -
+
+all_weeks[all_weeks.nct_id >= 70]
+
+#Looking at just 2021
+weeks_2021
+
+# +
+#The total reported trials in the matching 6 weeks to the post-letter 6 weeks
+# -
+
+weeks_2019.loc[18:].sum()
+
+weeks_2020.loc[18:].sum()
+
+weeks_2021.loc[18:].sum()
+
+# +
+#The 6 weeks immediately preceding the letter
+# -
+
+weeks_2021.loc[12:17].sum()
+
+# +
+#Graphing the trends. The letter was sent at the end of Week 17 and annoucned on the 1st day of Week 18 in 2021.
 
 # +
 fig, ax = plt.subplots(figsize = (20, 10), dpi=300)
 
 weeks_2019['nct_id'].plot(ax=ax, xticks=weeks_2019.index, label='2019', lw=3)
 weeks_2020['nct_id'].plot(ax=ax, label='2020', lw=3)
-weeks_2021['nct_id'].plot(ax=ax, label='2021', lw=3)
+weeks_2021['nct_id'].plot(ax=ax, label='2021', lw=3, grid=True)
 
-plt.axvline(x=16, color='red', label='2021 Letter Sent', lw=5)
+plt.axvline(x=17, color='red', label='2021 Letter Sent', lw=5)
 
 plt.legend(loc='upper left', fontsize=15)
 plt.tick_params(axis='both', which='major', labelsize=15)
@@ -113,19 +167,20 @@ plt.tick_params(axis='both', which='major', labelsize=15)
 ax.set_xlabel('Week of Year', fontsize=20, labelpad=10)
 ax.set_ylabel('New Trials Reported', fontsize=20, labelpad=10)
 
-plt.title("FDAAA Reporting in First 19 Weeks of Year: 2019-2021", pad = 20, fontsize = 25)
+plt.title("FDAAA Reporting in First 23 Weeks of Year: 2019-2021", pad = 20, fontsize = 25)
 
 plt.show()
-# -
 
-# Now what if we only look at overdue trials that reported?
+# +
+#Now what if we only look at overdue trials that reported?
+# -
 
 df['reported_late'] = np.where(((df.due_date < df.first_results_submission_any) & df.first_results_submission_any.notnull()), 1, 0)
 late_df = df[df['reported_late'] == 1][['nct_id', 'first_results_submission_any']].reset_index(drop=True)
 
-weeks_2021_late = get_weeks(late_df, '2020-12-30', '2021-05-12')
-weeks_2020_late = get_weeks(late_df, '2020-01-01', '2020-05-13')
-weeks_2019_late = get_weeks(late_df, '2019-01-02', '2019-05-15')
+weeks_2021_late = get_weeks(late_df, '2020-12-29', '2021-06-08')
+weeks_2020_late = get_weeks(late_df, '2019-12-31', '2020-06-09')
+weeks_2019_late = get_weeks(late_df, '2019-01-01', '2019-06-11')
 
 # +
 fig, ax = plt.subplots(figsize = (20, 10), dpi=300)
@@ -134,7 +189,7 @@ weeks_2019_late['nct_id'].plot(ax=ax, xticks=weeks_2019.index, label='2019', lw=
 weeks_2020_late['nct_id'].plot(ax=ax, label='2020', lw=3)
 weeks_2021_late['nct_id'].plot(ax=ax, label='2021', lw=3)
 
-plt.axvline(x=16, color='red', label='2021 Letter Sent', lw=5)
+plt.axvline(x=17, color='red', label='2021 Letter Sent', lw=5)
 
 plt.legend(loc='upper left', fontsize=15)
 plt.tick_params(axis='both', which='major', labelsize=15)
@@ -142,7 +197,7 @@ plt.tick_params(axis='both', which='major', labelsize=15)
 ax.set_xlabel('Week of Year', fontsize=20, labelpad=10)
 ax.set_ylabel('New Trials Reported', fontsize=20, labelpad=10)
 
-plt.title("Late FDAAA Reporting in First 19 Weeks of Year: 2019-2021", pad = 20, fontsize = 25)
+plt.title("Late FDAAA Reporting in First 23 Weeks of Year: 2019-2021", pad = 20, fontsize = 25)
 
 plt.show()
 # -
@@ -172,7 +227,7 @@ scrape_dates = [date(2018,3,15), date(2018,4,16), date(2018,5,15), date(2018,6,1
                 date(2020,1,15), date(2020,2,14), date(2020,3,16), date(2020,4,15), date(2020,5,15), 
                 date(2020,6,15), date(2020,7,15), date(2020,8,14), date(2020,9,15), date(2020,10,15), 
                 date(2020,11,16), date(2020,12,15), date(2021,1,15), date(2021,2,15), date(2021,3,15), 
-                date(2021,4,15), date(2021,5,14)]
+                date(2021,4,15), date(2021,5,14), date(2021,6,15)]
 
 #Location of previously processed CSVs.
 path2 = parent +'/data' #processed files should be here or edit as appropriate to point to their local location
@@ -237,6 +292,6 @@ plt.ylabel('# of Overdue Trials', fontsize=25, labelpad=10)
 
 ax.set_zorder(ax2.get_zorder()+1)
 ax.patch.set_visible(False)
-# -
+# +
 
 

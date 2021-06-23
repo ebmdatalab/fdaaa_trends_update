@@ -37,24 +37,24 @@ old_fda = parent + '/data/fdaaa_regulatory_snapshot.csv'
 #This takes a full clinicaltrials.gov dataset from our archives
 #Due to size, this is not in our GitHub repo, but stored on Dropbox 
 #Example path to data is below
-path = 'https://www.dropbox.com/s/864ov24rt8jaq5k/clinicaltrials_raw_clincialtrials_json_2021-04-15.csv.zip?dl=1'
+path = 'https://www.dropbox.com/s/rrdhpuosiveh5wf/clinicaltrials_raw_clincialtrials_json_2021-06-15.csv.zip?dl=1'
 
 from lib.data_functions import fda_reg, get_data
 
 fda_reg_dict = fda_reg(old_fda)
-lines = get_data(path, '2021-04-15')
+lines = get_data(path, '2021-06-15')
 
 #headers is just the list of header names to save space here
 from lib.final_df import make_row, make_dataframe, headers
 
 #Just pACTs/ACTs
-df = make_dataframe(tqdm(lines), fda_reg_dict, headers, act_filter=True, scrape_date = date(2021,4,15))
+df = make_dataframe(tqdm(lines), fda_reg_dict, headers, act_filter=True, scrape_date = date(2021,6,15))
 
 #We won't need this anymore so deleting to save some memory
 del lines
 
 #Uncomment this to save as a csv as appropriate
-df.to_csv(parent + '/data/applicable_trials_2021-04-15.csv', index=False)
+df.to_csv(parent + '/data/applicable_trials_2021-06-15.csv', index=False)
 # -
 
 
@@ -62,5 +62,6 @@ df.to_csv(parent + '/data/applicable_trials_2021-04-15.csv', index=False)
 
 
 
+# +
 
 
